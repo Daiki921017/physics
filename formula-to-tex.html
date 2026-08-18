@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数式 → TeX 変換ノート</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-paper:#EDF3EE;
+    --bg-line:#C9DBCE;
+    --ink:#1D3557;
+    --ink-soft:#5A6B7D;
+    --accent:#E08E45;
+    --accent-deep:#B86A2C;
+    --card:#FFFFFF;
+    --card-border:#DCE6DE;
+    --error:#C1442E;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background-color:var(--bg-paper);
+    background-image:
+      repeating-linear-gradient(0deg, var(--bg-line) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(90deg, var(--bg-line) 0 1px, transparent 1px 32px);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:28px 20px 80px;}
+
+  header{margin-bottom:22px;}
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.12em;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  h1{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:30px;
+    margin:4px 0 6px;
+    color:var(--ink);
+  }
+  .sub{font-size:14px; color:var(--ink-soft); line-height:1.6; max-width:56ch;}
+
+  .dropzone{
+    margin-top:22px;
+    border:2px dashed var(--bg-line);
+    border-radius:10px;
+    background:rgba(255,255,255,0.55);
+    padding:26px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--accent);
+    background:rgba(255,255,255,0.85);
+  }
+  .dropzone .icon{font-size:22px; margin-bottom:6px;}
+  .dropzone .label{font-size:14px; font-weight:500;}
+  .dropzone .hint{font-size:12px; color:var(--ink-soft); margin-top:4px;}
+  input[type=file]{display:none;}
+
+  .toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:26px;
+    margin-bottom:10px;
+    min-height:32px;
+  }
+  .count{font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--ink-soft);}
+  button.primary{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:9px 16px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  button.primary:hover{background:var(--accent-deep);}
+  button.primary:disabled{background:#C9C2B5; cursor:not-allowed;}
+
+  .cards{display:flex; flex-direction:column; gap:16px;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    box-shadow:0 1px 3px rgba(29,53,87,0.06);
+    overflow:hidden;
+  }
+  .card-head{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 14px;
+    border-bottom:1px solid var(--card-border);
+    background:#FBFAF6;
+  }
+  .tag{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    font-weight:500;
+    color:#fff;
+    background:var(--ink);
+    width:26px; height:26px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .thumb{
+    width:44px; height:44px;
+    object-fit:cover;
+    border-radius:6px;
+    border:1px solid var(--card-border);
+    flex-shrink:0;
+  }
+  .filename{font-size:12px; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;}
+  .status{font-size:12px; font-family:'JetBrains Mono', monospace; color:var(--ink-soft); flex-shrink:0;}
+  .status.err{color:var(--error);}
+
+  .card-body{padding:16px 14px;}
+  .preview{
+    min-height:44px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:14px 6px;
+    font-size:19px;
+    overflow-x:auto;
+  }
+  .preview.loading{color:var(--ink-soft); font-family:'JetBrains Mono', monospace; font-size:12px;}
+  .preview.err{color:var(--error); font-family:'Inter',sans-serif; font-size:13px;}
+
+  textarea.tex{
+    width:100%;
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+    color:var(--ink);
+    background:#F7F5EF;
+    border:1px solid var(--card-border);
+    border-radius:6px;
+    padding:10px 12px;
+    resize:vertical;
+    min-height:44px;
+    line-height:1.5;
+  }
+  .row-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:8px;
+  }
+  button.chip{
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    font-weight:500;
+    background:#fff;
+    border:1px solid var(--card-border);
+    color:var(--ink);
+    padding:6px 11px;
+    border-radius:5px;
+    cursor:pointer;
+  }
+  button.chip:hover{border-color:var(--accent); color:var(--accent-deep);}
+  button.chip.copied{border-color:var(--accent); color:var(--accent-deep); background:#FFF6EC;}
+
+  .empty{
+    text-align:center;
+    padding:36px 10px;
+    color:var(--ink-soft);
+    font-size:13px;
+  }
+
+  .tip{
+    margin-top:30px;
+    background:rgba(255,255,255,0.6);
+    border-left:3px solid var(--accent);
+    padding:12px 14px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    line-height:1.7;
+    border-radius:0 8px 8px 0;
+  }
+  .tip b{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Formula Notebook</div>
+    <h1>数式 → TeX 変換ノート</h1>
+    <p class="sub">数式の写真をまとめてアップロードすると、TeX形式に変換してプレビューします。Wordの数式エディタ(LaTeX入力モード)にそのまま貼り付けられます。</p>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <div class="icon">📎</div>
+    <div class="label">クリックして画像を選択、またはドラッグ&ドロップ</div>
+    <div class="hint">複数枚まとめて選択できます (JPEG / PNG / WEBP)</div>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+  </div>
+
+  <div class="toolbar">
+    <span class="count" id="count">0 件</span>
+    <button class="primary" id="copyAllBtn" disabled>全てコピー</button>
+  </div>
+
+  <div class="cards" id="cards"></div>
+  <div class="empty" id="emptyMsg">まだ数式がありません。上のエリアから画像を追加してください。</div>
+
+  <div class="tip">
+    <b>Wordへの貼り付け方:</b> 数式を挿入 → 数式エディタ内で入力方式を「UnicodeMath」から「LaTeX」に切り替え → コピーしたTeXコードを貼り付けると自動でWordの数式に変換されます。
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const cardsEl = document.getElementById('cards');
+  const emptyMsg = document.getElementById('emptyMsg');
+  const countEl = document.getElementById('count');
+  const copyAllBtn = document.getElementById('copyAllBtn');
+
+  let items = []; // {id, name, thumbUrl, status, tex, error}
+  let nextId = 1;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+    handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', e => {
+    handleFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  function handleFiles(fileList) {
+    const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    files.forEach(file => {
+      const id = nextId++;
+      const thumbUrl = URL.createObjectURL(file);
+      const item = { id, name: file.name, thumbUrl, status: 'loading', tex: '', error: '' };
+      items.push(item);
+      render();
+      convertImage(file, item);
+    });
+  }
+
+  async function convertImage(file, item) {
+    try {
+      const base64 = await fileToBase64(file);
+      const mediaType = file.type || 'image/png';
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+              { type: "text", text: "この画像に写っている数式をLaTeXのソースコードに書き起こしてください。出力はLaTeXコードのみとし、説明文・前置き・Markdownのコードフェンス(```)・$や$$などの数式デリミタは一切付けないでください。Word の数式エディタの LaTeX 入力モードにそのまま貼り付けられる形式(\\frac, \\sqrt, \\int, \\sum, ギリシャ文字は \\alpha 等, 添字は _ と ^, \\Delta, \\partial など標準的なLaTeXコマンド)で書いてください。画像内に複数の数式がある場合は、それぞれを改行で区切ってください。" }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) throw new Error('API error: ' + response.status);
+      const data = await response.json();
+      const text = (data.content || [])
+        .map(b => b.type === 'text' ? b.text : '')
+        .join('')
+        .trim();
+
+      if (!text) throw new Error('変換結果が空でした');
+
+      item.status = 'done';
+      item.tex = text;
+    } catch (err) {
+      item.status = 'error';
+      item.error = err.message || '変換に失敗しました';
+    }
+    render();
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function render() {
+    emptyMsg.style.display = items.length ? 'none' : 'block';
+    countEl.textContent = items.length + ' 件';
+    copyAllBtn.disabled = !items.some(i => i.status === 'done');
+
+    cardsEl.innerHTML = '';
+    items.forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const head = document.createElement('div');
+      head.className = 'card-head';
+      head.innerHTML = `
+        <span class="tag">${idx + 1}</span>
+        <img class="thumb" src="${item.thumbUrl}" alt="">
+        <span class="filename">${escapeHtml(item.name)}</span>
+        <span class="status ${item.status === 'error' ? 'err' : ''}">${statusLabel(item.status)}</span>
+      `;
+      card.appendChild(head);
+
+      const body = document.createElement('div');
+      body.className = 'card-body';
+
+      const preview = document.createElement('div');
+      if (item.status === 'loading') {
+        preview.className = 'preview loading';
+        preview.textContent = '変換中…';
+      } else if (item.status === 'error') {
+        preview.className = 'preview err';
+        preview.textContent = item.error;
+      } else {
+        preview.className = 'preview';
+      }
+      body.appendChild(preview);
+
+      if (item.status === 'done') {
+        const textarea = document.createElement('textarea');
+        textarea.className = 'tex';
+        textarea.value = item.tex;
+        textarea.rows = Math.min(6, Math.max(2, item.tex.split('\n').length));
+        textarea.addEventListener('input', () => {
+          item.tex = textarea.value;
+          renderKatex(preview, item.tex);
+        });
+        body.appendChild(textarea);
+
+        const actions = document.createElement('div');
+        actions.className = 'row-actions';
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'chip';
+        copyBtn.textContent = 'コピー';
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(item.tex);
+          copyBtn.textContent = 'コピーしました';
+          copyBtn.classList.add('copied');
+          setTimeout(() => { copyBtn.textContent = 'コピー'; copyBtn.classList.remove('copied'); }, 1500);
+        });
+        actions.appendChild(copyBtn);
+        body.appendChild(actions);
+
+        renderKatex(preview, item.tex);
+      }
+
+      card.appendChild(body);
+      cardsEl.appendChild(card);
+    });
+  }
+
+  function renderKatex(el, tex) {
+    try {
+      katex.render(tex, el, { throwOnError: false, displayMode: true });
+    } catch (e) {
+      el.textContent = tex;
+    }
+  }
+
+  function statusLabel(status) {
+    if (status === 'loading') return '変換中';
+    if (status === 'error') return 'エラー';
+    return '完了';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  copyAllBtn.addEventListener('click', () => {
+    const blocks = items
+      .filter(i => i.status === 'done')
+      .map((i, idx) => `[${idx + 1}] ${i.name}\n${i.tex}`);
+    navigator.clipboard.writeText(blocks.join('\n\n'));
+    const original = copyAllBtn.textContent;
+    copyAllBtn.textContent = 'コピーしました';
+    setTimeout(() => { copyAllBtn.textContent = original; }, 1500);
+  });
+</script>
+</body>
+</html>
